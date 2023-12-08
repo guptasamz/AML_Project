@@ -1,0 +1,4 @@
+,Type,Data Version,Model,MSE,RMSE,MAE
+0,train,2,Deep Ensemble,0.022360766,0.14953516,0.12776169
+1,val,2,Deep Ensemble,0.024740595,0.15729143,0.13390411
+2,test,2,Deep Ensemble,0.024049519,0.15507907,0.13187407
