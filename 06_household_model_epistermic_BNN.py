@@ -1,72 +1,102 @@
-
+# %%
 import os
 import warnings
 warnings.filterwarnings('ignore')
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-import logging
 from tensorflow.keras.layers import *
 import pandas as pd
-import matplotlib.pyplot as plt
 import pathlib
 import torch
 from torch.utils.data import TensorDataset, DataLoader
-from scipy import stats
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import scatter, figure
-import math
-import math
 import numpy as np
-import pandas as pd
 import seaborn as sns
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import scatter, figure
-import argparse
-import torch.nn as nn
-import torch.nn.functional as F
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 sns.set(rc={'figure.figsize':(9, 7)})
-figure(figsize=(9, 7))
-pd.set_option('display.max_columns', None)
+
+# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+# Coral Ordinal Function and Custom metric defining here
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 MODEL_PATH = '../data/models/'
 DATA_DIR = '../data/'
+
+
+# %%
+DATA_DIR = '../data'
+
+pd.set_option('display.max_columns', None)
+
+# %%
+
+
+figure(figsize=(9, 7))
+# start = -0.5
+# end = 0.5
 n = 300
 
-# Create the parser
-parser = argparse.ArgumentParser(description="Script for generating the results")
-# Add the --value argument
-parser.add_argument('--dv', type=int, help="Data version")
-# Parse the arguments
-args = parser.parse_args()
-# Asking the user for their name
-data_type = int(args.dv)
+# %%
+# import argparse
+# # Create the parser
+# parser = argparse.ArgumentParser(description="Script for generating the results")
+# # Add the --value argument
+# parser.add_argument('--dv', type=int, help="Data version")
+# # Parse the arguments
+# args = parser.parse_args()
+# # Asking the user for their name
+# data_type = int(args.dv)
 num_features = 1
+data_type = 4
 
-path = f'../data/new_data/data{data_type}/'
+# %%
+data_version = ''
+if data_type != 4:
 
-train_df = pd.read_csv(f'{path}/Data{data_type}_Train.csv')
-val_df = pd.read_csv(f'{path}/Data{data_type}_Val.csv')
-test_df = pd.read_csv(f'{path}/Data{data_type}_Test.csv')
+    data_version = 'synthetic'
 
-data_plt_op_dir = f'./results/data{data_type}'
-pathlib.Path(data_plt_op_dir).mkdir(parents=True, exist_ok=True) 
+    path = f'../data/new_data/data{data_type}/'
 
-scatter(train_df.Input1, train_df.Output, c="red", marker="*")
-output_path = f'{data_plt_op_dir}/data_train_{data_type}.png'
-plt.savefig(output_path)
+    train_df = pd.read_csv(f'{path}/Data{data_type}_Train.csv')
+    val_df = pd.read_csv(f'{path}/Data{data_type}_Val.csv')
+    test_df = pd.read_csv(f'{path}/Data{data_type}_Test.csv')
+
+else:
+    data_version = 'household_power'
+    path = f'../data/{data_version}/'
+
+    feature_x = pd.read_csv(f'{path}/feature_x.csv')
+
+    train_x = np.load(f'{path}/train_x.npy')
+    train_y = np.load(f'{path}/train_y.npy')
+
+    val_x = np.load(f'{path}/val_x.npy')
+    val_y = np.load(f'{path}/val_y.npy')
+
+    test_x = np.load(f'{path}/test_x.npy')
+    test_y = np.load(f'{path}/test_y.npy')
+
+
+# %%
+# feature_x[:train_x.shape[0]].dt
+feature_x[train_x.shape[0]+val_x.shape[0]:train_x.shape[0]+val_x.shape[0]+test_x.shape[0]][:100]
+
+
+# %%
+train_x.shape, train_y.shape, val_x.shape, val_y.shape, test_x.shape, test_y.shape
+
+# %%
+
+scatter(feature_x[:train_x.shape[0]].dt[:1000], train_y[:1000], c="red", marker="*")
+plt.clf()
+# %%
+scatter(feature_x[train_x.shape[0]+val_x.shape[0]:train_x.shape[0]+val_x.shape[0]+test_x.shape[0]].dt[:20], test_y[:20], c="red", marker="*")
 plt.clf()
 
-scatter(test_df.Input1, test_df.Output, c="red", marker="*")
-
-output_path = f'{data_plt_op_dir}/data_test_{data_type}.png'
-plt.savefig(output_path)
-plt.clf()
-
+# %%
 def get_mcdo_hyperparameters(data_type):
     hp_search_data_path =f'./hyperparameter_search/RAY_RESULTS_mcdo_data{data_type}.csv'
     hp_df = pd.read_csv(hp_search_data_path)
@@ -76,30 +106,40 @@ def get_mcdo_hyperparameters(data_type):
 
     return int(hp_df['batch_size'].iloc[0]), int(hp_df['hidden_size'].iloc[0]), int(hp_df['num_layers'].iloc[0]), hp_df['drop_out'].iloc[0], hp_df['lr'].iloc[0], int(hp_df['patience'].iloc[0]), hp_df['epochs'].iloc[0]
 
+# %%
 batch_size, hidden_size, num_layers, drop_out, learning_rate, patience, epochs =get_mcdo_hyperparameters(data_type)
-print(f'MCDO hyperparameters for data set: {data_type}')
 print(batch_size, hidden_size, num_layers, drop_out, learning_rate, patience, epochs)
 
-tensor_train_data = torch.Tensor(train_df.Input1).unsqueeze(1)
-tensor_train_label = torch.Tensor(train_df.Output)
+# %%
+tensor_train_data = torch.Tensor(train_x)
+tensor_train_label = torch.Tensor(train_y)
 
-tensor_val_data = torch.Tensor(val_df.Input1).unsqueeze(1)
-tensor_val_label = torch.Tensor(val_df.Output)
+tensor_val_data = torch.Tensor(val_x)
+tensor_val_label = torch.Tensor(val_y)
 
-tensor_test_data = torch.Tensor(test_df.Input1).unsqueeze(1)
-tensor_test_label = torch.Tensor(test_df.Output)
+tensor_test_data = torch.Tensor(test_x)
+tensor_test_label = torch.Tensor(test_y)
+
+# %%
+tensor_train_data.shape, tensor_train_label.shape, tensor_val_data.shape, tensor_val_label.shape, tensor_test_data.shape, tensor_test_label.shape
 
 
+# %%
 def normalize_values(x):
     max_x = torch.max(x,dim=0)
     min_x = torch.min(x,dim=0)
+
+    # print(max_x.values, min_x.values)
+
     range_x = max_x.values - min_x.values
+    # print(range_x)
+
     #Normalizing
     x = (x - min_x.values)/range_x
 
     return x
 
-
+# %%
 train_dataset = TensorDataset(tensor_train_data, tensor_train_label)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
@@ -109,7 +149,18 @@ val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 test_dataset = TensorDataset(tensor_test_data, tensor_test_label)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
-############### Monte Carlo Dropout ##########################
+
+# %%
+num_features = 7
+
+# %% [markdown]
+# ### Monte Carlo Dropout
+
+# %%
+from numpy.ma.core import outer
+from sys import stderr
+import torch.nn as nn
+import torch.nn.functional as F
 
 class MCDO(nn.Module):
     def __init__(self, num_features, hidden_size, n_layers, drop_out):
@@ -138,11 +189,14 @@ model = MCDO(num_features, hidden_size, num_layers, drop_out)
 print(model)
 print("Params:", sum(p.numel() for p in model.parameters() if p.requires_grad))
 
-train_df.Input1.min()
-train_df.Input1.max()
+# %%
+feature_x['str_dt'] = feature_x.dt.str[5:-6]
 
-
+# %%
 def make_plot_mcdo(model, data_type, epoch, samples = 50):
+    num_data_points = 40
+
+    # Keep dropout active!
     model.train()
     preds = [model(tensor_test_data) for i in range(samples)]
     preds = torch.stack(preds)
@@ -157,41 +211,51 @@ def make_plot_mcdo(model, data_type, epoch, samples = 50):
             "y": list(y_vals[i].squeeze())
       }
       temp = pd.DataFrame.from_dict(data)
+      temp['x'] = feature_x[train_x.shape[0]+val_x.shape[0]:train_x.shape[0]+val_x.shape[0]+test_x.shape[0]].str_dt.reset_index(drop=True)
+      temp = temp[:num_data_points]
       dfs.append(temp)
+
+    start = temp['x'].min()
+    end = temp['x'].max()
 
     df = pd.concat(dfs).reset_index()
 
-    # Plot predictions
+    # Plot predictions with confidence
     sns_plot = sns.lineplot(data=df, x="x", y="y")
 
-    start = train_df.Input1.min()
-    end = train_df.Input1.max()
-
-    print(start)
-    # Getting range
+    # Highlight training range
     plt.axvline(x=start)
     plt.axvline(x=end)
 
-    # Plot data on top of the uncertainty region
-    scatter(train_df.Input1, train_df.Output, c="green", marker="*", alpha=0.1)
+    inp_x = feature_x[train_x.shape[0]+val_x.shape[0]:train_x.shape[0]+val_x.shape[0]+test_x.shape[0]].str_dt[:num_data_points]
+    inp_y = test_y[:num_data_points]
+    # Plot train data on top
+    scatter(inp_x, inp_y, c="green", marker="*", alpha=0.4)
 
-    op_dir = f'./results/data{data_type}'
+     # Remove x-axis labels and set custom numeric labels
+    plt.xticks([])  # Remove x-axis labels
+    # plt.gca().set_xticks(range(1, num_data_points*3 + 1))  # Set custom numeric labels
+    # Rotate the X-axis tick labels by 30 degrees
+    plt.xticks(rotation=-60)
+
+    op_dir = f'./results/{data_version}'
     pathlib.Path(op_dir).mkdir(parents=True, exist_ok=True) 
 
-    output_path = f'{op_dir}/data{data_type}_mcdo_epoch{epoch}.png'
+    output_path = f'{op_dir}/data{data_type}_mcdo_epoch{epoch}_{data_version}.png'
     plt.savefig(output_path)
     plt.clf()
     plt.show()
 
-
+# %%
 criterion = torch.nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 device = 'cpu'
 model.to(device)
 
+# patience = patience
 best_val_loss = float('inf')
 epochs_no_improve = 0
-best_model_path = f'./model_data/mcdo/best_model_mcdo_data_type_{data_type}.pt'
+best_model_path = f'./model_data/mcdo/best_model_mcdo_data_type_{data_type}_{data_version}.pt'
 
 for epoch in range(epochs):
     model.train()
@@ -230,31 +294,32 @@ for epoch in range(epochs):
             break
 
     print(f'Epoch: {epoch}|Train Loss: {loss}|Val Loss: {avg_val_loss}')
+# After training, load the best model
 
     if epoch % 10 == 0:
         all_test_losses = []
-        # Testing
+        # Test loop
         for batch in test_loader:
                 x = batch[0].to(device)
                 y = batch[1].to(device)
 
-                # Sampling monte carlo Dropout predictions - 10 samples 
+                # Sample MC Dropout predictions
                 outs = []
                 for i in range(10):
                     out = model(x)
                     outs.append(out)
 
-                # Taking the mean of the prediction 
+                # Take mean prediction
                 out = sum(outs)/len(outs)
                 all_test_losses.append(criterion(y, out).item())
         test_loss = sum(all_test_losses)/len(all_test_losses)
         print(f"Epoch {epoch} | batch train loss: {loss} | test loss: {test_loss}")
         make_plot_mcdo(model, data_type, epoch,50)
 
-# After training, load the best model   
 model.load_state_dict(torch.load(best_model_path))  
 
-# Getting the prediction for the last epoch
+
+# %%
 if epoch-1 % 10 != 0:
         all_test_losses = []
         # Test loop
@@ -262,19 +327,20 @@ if epoch-1 % 10 != 0:
                 x = batch[0].to(device)
                 y = batch[1].to(device)
 
-                # Sampling monte carlo Dropout predictions - 10 samples 
+                # Sample MC Dropout predictions
                 outs = []
                 for i in range(10):
                     out = model(x)
                     outs.append(out)
 
-                # Taking the mean of the prediction 
+                # Take mean prediction
                 out = sum(outs)/len(outs)
                 all_test_losses.append(criterion(y, out).item())
         test_loss = sum(all_test_losses)/len(all_test_losses)
         print(f"Epoch {epoch} | batch train loss: {loss} | test loss: {test_loss}")
         make_plot_mcdo(model,data_type, epoch,50)
 
+# %%
 def get_mcdo_results(model,data_set,y_true,type,data_type):
     samples = 50
 
@@ -316,12 +382,13 @@ df_res.append(get_mcdo_results(model,tensor_test_data, tensor_test_label,'test',
 
 df_res = pd.concat(df_res).reset_index(drop=True)
 
-df_res.to_csv(f'./results/data{data_type}/results_mcdo_{data_type}.csv')
+df_res.to_csv(f'./results/{data_version}/results_mcdo_{data_type}_{data_version}.csv')
 
-################# Copleted MCDO model  ##############################
-#####################################################################
+# %% [markdown]
+# ### Deep Ensemble Model 
 
-################# Deep Ensemble Model ##############################
+# %%
+import pandas as pd
 
 def get_de_hyperparameters(data_type):
     hp_search_data_path =f'./hyperparameter_search/RAY_RESULTS_de_data{data_type}.csv'
@@ -332,12 +399,12 @@ def get_de_hyperparameters(data_type):
 
     return int(hp_df['batch_size'].iloc[0]), int(hp_df['hidden_size'].iloc[0]), int(hp_df['num_layers'].iloc[0]), hp_df['lr'].iloc[0], int(hp_df['patience'].iloc[0]), hp_df['epochs'].iloc[0]
 
+# %%
 batch_size, hidden_size, num_layers, learning_rate, patience, epochs = get_de_hyperparameters(data_type)
-print(f'Deep ensemble hyperparameters for data set: {data_type}')
 print(batch_size, hidden_size, num_layers, learning_rate, patience, epochs)
 num_models =  5
 
-
+# %%
 train_dataset = TensorDataset(tensor_train_data, tensor_train_label)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
@@ -376,7 +443,10 @@ model = DeepEnsembleNet(num_features,hidden_size, num_layers)
 print(model)
 print("Params:", sum(p.numel() for p in model.parameters() if p.requires_grad))
 
+# %%
 def make_plot_de(model,data_type,epoch):
+    num_data_points = 40
+
     mus = []
     vars = []
     for m in model:
@@ -384,6 +454,7 @@ def make_plot_de(model,data_type,epoch):
         mus.append(mu)
         vars.append(var)
 
+    # For epistemic uncertainty we calculate the std on the mus!
     means = torch.stack(mus).mean(axis=0).detach().numpy()
     stds = torch.stack(mus).std(axis=0).detach().numpy()**(1/2)
 
@@ -396,6 +467,10 @@ def make_plot_de(model,data_type,epoch):
             "y": list(y_vals[i].squeeze())
       }
       temp = pd.DataFrame.from_dict(data)
+      temp['x'] = feature_x[train_x.shape[0]+val_x.shape[0]:train_x.shape[0]+val_x.shape[0]+test_x.shape[0]].str_dt.reset_index(drop=True)
+      start = temp['x'].min()
+      end = temp['x'].max()
+      temp = temp[:num_data_points]
       dfs.append(temp)
 
     df = pd.concat(dfs).reset_index()
@@ -403,30 +478,41 @@ def make_plot_de(model,data_type,epoch):
     # Plot predictions with confidence
     sns_plot = sns.lineplot(data=df, x="x", y="y")
 
-    start = train_df.Input1.min()
-    end = train_df.Input1.max()
+  #   start = train_df.Input1.min()
+  #   end = train_df.Input1.max()
 
-    # Highlight training range
+  # # Highligh training range
     plt.axvline(x=start)
     plt.axvline(x=end)
 
-    # Plot data on top of the uncertainty region
-    scatter(train_df.Input1, train_df.Output, c="green", marker="*", alpha=0.1)
+    # Plot train data on top
 
-    op_dir = f'./results/data{data_type}'
+    inp_x = feature_x[train_x.shape[0]+val_x.shape[0]:train_x.shape[0]+val_x.shape[0]+test_x.shape[0]].str_dt[:num_data_points]
+    inp_y = test_y[:num_data_points]
+    # plt.xticks(rotation=-60)
+    # Remove x-axis labels and set custom numeric labels
+    plt.xticks([])  # Remove x-axis labels
+    # plt.gca().set_xticks(range(1, num_data_points + 1))  # Set custom numeric labels
+
+    scatter(inp_x, inp_y, c="green", marker="*", alpha=0.4)
+
+    op_dir = f'./results/{data_version}'
     pathlib.Path(op_dir).mkdir(parents=True, exist_ok=True) 
 
-    output_path = f'{op_dir}/data{data_type}_de_epoch{epoch}.png'
+    output_path = f'{op_dir}/data{data_type}_de_epoch{epoch}_{data_version}.png'
     plt.savefig(output_path)
-    plt.show()
     plt.clf()
+    plt.show()
 
+# %%
 # Construct ensemble
 # num_models = 5
+device = 'cpu'
 deep_ensemble = [DeepEnsembleNet(num_features,hidden_size, num_layers).to(device) for i in range(num_models)]
 criterion = torch.nn.GaussianNLLLoss(eps=1e-02)
 optimizers = [optim.Adam(m.parameters(), lr=learning_rate) for m in deep_ensemble]
 
+# %%
 # Early stopping parameters
 best_val_loss = float('inf')
 epochs_no_improve = 0
@@ -507,29 +593,30 @@ for epoch in range(epochs):
 # After training, load the best model
 model.load_state_dict(torch.load(best_model_path))
 
-if epoch-1 % 10 != 0:
-    all_test_losses = []
-    # Test loop
-    for batch in test_loader:
-        x = batch[0].to(device)
-        y = batch[1].to(device)
+# %%
 
-        test_losses = []
-        mus = []
-        vars = []
-        for i, model in enumerate(deep_ensemble):
-            optimizers[i].zero_grad()
-            mu, var = model(x)
-            test_loss = criterion(mu, y, var)
-            optimizers[i].step()
+all_test_losses = []
+# Test loop
+for batch in test_loader:
+    x = batch[0].to(device)
+    y = batch[1].to(device)
 
-            test_losses.append(test_loss.item())
-            mus.append(mu)
-            vars.append(var)
-        all_test_losses.append((sum(test_losses)/len(test_losses)))
-    test_loss = sum(all_test_losses)/len(all_test_losses)
-    print(f"Epoch {epoch} | batch train loss: {loss} | test loss: {test_loss}")
-    make_plot_de(deep_ensemble,data_type,epoch)
+    test_losses = []
+    mus = []
+    vars = []
+    for i, model in enumerate(deep_ensemble):
+        optimizers[i].zero_grad()
+        mu, var = model(x)
+        test_loss = criterion(mu, y, var)
+        optimizers[i].step()
+
+        test_losses.append(test_loss.item())
+        mus.append(mu)
+        vars.append(var)
+    all_test_losses.append((sum(test_losses)/len(test_losses)))
+test_loss = sum(all_test_losses)/len(all_test_losses)
+print(f"Epoch {epoch} | batch train loss: {loss} | test loss: {test_loss}")
+make_plot_de(deep_ensemble,data_type,epoch)
 
 def get_deep_ensemble_results(model,data_set,y_true,type,data_type):
     mus = []
@@ -576,10 +663,8 @@ df_res.append(get_deep_ensemble_results(deep_ensemble,tensor_test_data, tensor_t
 
 df_res = pd.concat(df_res).reset_index(drop=True)
 
-df_res.to_csv(f'./results/data{data_type}/results_deep_ensemble_{data_type}.csv')
+df_res.to_csv(f'./results/{data_version}/results_deep_ensemble_{data_type}_{data_version}.csv')
 
 
-################# Code Completed Executing #####################
-#####################################################################
-#####################################################################
-#####################################################################
+
+

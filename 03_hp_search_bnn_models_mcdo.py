@@ -3,53 +3,24 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-import logging
 from tensorflow.keras.layers import *
-import tensorflow as tf
-import keras
-from keras import Model
-from keras import regularizers
-from keras.layers import Dense, Dropout
-from keras import layers
 import pandas as pd
 import numpy as np
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
-from sklearn.metrics import precision_score, recall_score, f1_score
-from sklearn.model_selection import StratifiedKFold
 import pathlib
-import ast
-import json
-import coral_ordinal as coral
 from sklearn.metrics import precision_recall_fscore_support
-from tqdm import tqdm
-from imblearn.over_sampling import SMOTENC
-from numpy import loadtxt
-from sklearn.metrics import accuracy_score
-from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBClassifier
-from sklearn.svm import SVC
 import torch
 from torch.utils.data import TensorDataset, DataLoader
-from scipy import stats
 import matplotlib.pyplot as plt
-from matplotlib.pyplot import scatter, figure
-import math
 import numpy as np
-import math
 import numpy as np
-from scipy import stats
 import pandas as pd
 import seaborn as sns
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
 import matplotlib.pyplot as plt
-from matplotlib.pyplot import scatter, figure
 sns.set(rc={'figure.figsize':(9, 7)})
-from blitz.modules import BayesianLinear
-from blitz.utils import variational_estimator
 
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -60,62 +31,6 @@ DATA_DIR = '../data/'
 
 
 # %%
-# Important functions for test accuracy and confusion matrix
-def predict_get_f1_accuracy(y_true, y_pred, num_classes):
-    # Resetting the index
-    y_true = y_true.reset_index(drop=True)
-
-    # Function for custom distance accuracy metric
-    def accuracy_metric(y_true, y_pred):
-        a = []
-
-        for i in range(len(y_true)):
-            yt = y_true[i]
-            yp = y_pred[i]
-
-            temp = 1 - (np.abs(yt - yp) / num_classes)
-            a.append(temp)
-        # print(a)
-        accuracy = sum(a) / len(y_true)
-
-        return accuracy
-
-    # Getting the f1 score using sklearn.metrics.precision_recall_fscore_support
-    f1_score_test = precision_recall_fscore_support(y_true, y_pred, average='weighted')
-
-    # Getting the custom distance accuracy metric
-    custom_accuracy_test = accuracy_metric(y_true, y_pred)
-
-    # Returing the values
-    return f1_score_test[2], custom_accuracy_test
-
-
-def save_confusion_matrix_func(y_test, yp, title, path, route_id):
-    cm = confusion_matrix(y_test, yp)
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-    # Plot the confusion matrix
-    fig, ax = plt.subplots(figsize=(8, 6))
-    _ = disp.plot(ax=ax)
-    # Add a title to the plot
-    ax.set_title(title + " - Real Count")
-    plt.savefig(f'{path}/CM_real_count_{route_id}.jpg')
-
-    # Getting the percentage CM
-    cm = ((cm * 100) / (cm.sum(axis=1)[:, np.newaxis]))
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-    # Plot the confusion matrix
-    fig, ax = plt.subplots(figsize=(8, 6))
-    _ = disp.plot(ax=ax)
-    # Add a title to the plot
-    ax.set_title(title + " - Percentages")
-    plt.savefig(f'{path}/CM_percentage_{route_id}.jpg')
-
-
-
-DATA_DIR = '../data'
-
-pd.set_option('display.max_columns', None)
-
 import argparse
 # Create the parser
 parser = argparse.ArgumentParser(description="Script for generating the deep ensemble hyperparameter results")
@@ -126,28 +41,70 @@ args = parser.parse_args()
 # Asking the user for their name
 data_type = int(args.dv)
 
-path = f'../data/new_data/data{data_type}/'
-train_df = pd.read_csv(f'{path}/Data{data_type}_Train.csv')
-val_df = pd.read_csv(f'{path}/Data{data_type}_Val.csv')
-test_df = pd.read_csv(f'{path}/Data{data_type}_Test.csv')
+# %%
 
-tensor_train_data = torch.Tensor(train_df.Input1).unsqueeze(1)
-tensor_train_label = torch.Tensor(train_df.Output)
+version = 'stl_1'
+log_version = 'stl_1'
+EPOCHS = 200
 
-tensor_val_data = torch.Tensor(val_df.Input1).unsqueeze(1)
-tensor_val_label = torch.Tensor(val_df.Output)
+DATA_DIR = '../data'
 
-tensor_test_data = torch.Tensor(test_df.Input1).unsqueeze(1)
-tensor_test_label = torch.Tensor(test_df.Output)
+pd.set_option('display.max_columns', None)
 
-train_dataset = TensorDataset(tensor_train_data, tensor_train_label)
-val_dataset = TensorDataset(tensor_val_data, tensor_val_label)
+# %%
+data_version = ''
+if data_type != 4:
 
+    data_version = 'synthetic'
 
+    path = f'../data/new_data/data{data_type}/'
+
+    train_df = pd.read_csv(f'{path}/Data{data_type}_Train.csv')
+    val_df = pd.read_csv(f'{path}/Data{data_type}_Val.csv')
+    test_df = pd.read_csv(f'{path}/Data{data_type}_Test.csv')
+
+    tensor_train_data = torch.Tensor(train_df.Input1).unsqueeze(1)
+    tensor_train_label = torch.Tensor(train_df.Output)
+
+    tensor_val_data = torch.Tensor(val_df.Input1).unsqueeze(1)
+    tensor_val_label = torch.Tensor(val_df.Output)
+
+    tensor_test_data = torch.Tensor(test_df.Input1).unsqueeze(1)
+    tensor_test_label = torch.Tensor(test_df.Output)
+
+    train_dataset = TensorDataset(tensor_train_data, tensor_train_label)
+    val_dataset = TensorDataset(tensor_val_data, tensor_val_label)
+
+else:
+    data_version = 'household_power'
+    path = f'../data/{data_version}/'
+
+    # feature_x = pd.read_csv(f'{path}/feature_x.csv')
+    train_x = np.load(f'{path}/train_x.npy')
+    train_y = np.load(f'{path}/train_y.npy')
+
+    val_x = np.load(f'{path}/val_x.npy')
+    val_y = np.load(f'{path}/val_y.npy')
+
+    test_x = np.load(f'{path}/test_x.npy')
+    test_y = np.load(f'{path}/test_y.npy')
+
+    tensor_train_data = torch.Tensor(train_x)
+    tensor_train_label = torch.Tensor(train_y)
+
+    tensor_val_data = torch.Tensor(val_x)
+    tensor_val_label = torch.Tensor(val_y)
+
+    tensor_test_data = torch.Tensor(test_x)
+    tensor_test_label = torch.Tensor(test_y)
+
+    train_dataset = TensorDataset(tensor_train_data, tensor_train_label)
+    val_dataset = TensorDataset(tensor_val_data, tensor_val_label)
+
+# %%
 import torch
 import torch.optim as optim
 from ray import tune
-from ray.tune.schedulers import ASHAScheduler
 
 class MCDO(nn.Module):
     def __init__(self, num_features, hidden_size, n_layers, drop_out):
@@ -188,7 +145,7 @@ def train_mcdo(config):
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 
-    model_name = f'hs_{hidden_size}_nl_{num_layers}_do_{config["drop_out"]}_ep_{config["epochs"]}_p_{config["patience"]}_lr_{config["lr"]}_bs_{batch_size}'
+    model_name = f'hs_{hidden_size}_nl_{num_layers}_do_{config["drop_out"]}_ep_{config["epochs"]}_p_{config["patience"]}_lr_{config["lr"]}_bs_{batch_size}.pt'
 
     models[f'{model_name}']= MCDO(config["num_features"], hidden_size, num_layers, config["drop_out"])
 
@@ -199,7 +156,7 @@ def train_mcdo(config):
     
     best_model_dir = f'./models/'
     pathlib.Path(best_model_dir).mkdir(parents=True, exist_ok=True) 
-    best_model_path = f'{best_model_dir}/hs_{hidden_size}_nl_{num_layers}_do_{config["drop_out"]}_ep_{config["epochs"]}_p_{config["patience"]}_lr_{config["lr"]}_bs_{batch_size}.pt'
+    best_model_path = f'{best_model_dir}/hs_{hidden_size}_nl_{num_layers}_do_{config["drop_out"]}_ep_{config["epochs"]}_p_{config["patience"]}_lr_{config["lr"]}_bs_{batch_size}'
     best_val_loss = float('inf')
     epochs_no_improve = 0
 
@@ -246,12 +203,15 @@ def train_mcdo(config):
 
 
 def main(num_samples=100, max_num_epochs=500):
-    
-
     ray.init()
 
+    if data_type != 4:
+        num_features = 1
+    else:
+        num_features = 7
+
     config = {
-        "num_features": 1,
+        "num_features": num_features,
         "hidden_size": tune.quniform(1, 200, 1),
         "num_layers": tune.quniform(2, 10, 1),
         "drop_out": tune.uniform(0.1, 0.5),
@@ -276,7 +236,7 @@ def main(num_samples=100, max_num_epochs=500):
             num_samples=num_samples,
             # max_concurrent_trials=20,
             local_dir= f'/home/sgupta/WORK/Triplevel_transformer_model/baselines/hyperparameter_search',
-            name=f"experiment_mcdo_data2",
+            name=f"experiment_mcdo_data{data_type}",
             max_failures=7,
             raise_on_failed_trial=False
         )
@@ -292,8 +252,5 @@ import ray
 main(100,500)
 #  Stop Ray
 ray.shutdown()
-
-# %%
-models
 
 
