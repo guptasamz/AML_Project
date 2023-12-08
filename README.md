@@ -1,5 +1,10 @@
 # AML Project README
 
+## Python version and Packages
+The python version used for this project was `Python 3.9.18`. The required packages for this project can be installed using the `requirements.txt` file. Please use the below code to install all the packages.
+
+`pip install -r requirements.txt`
+
 ## Required datasets
 The datasets for this project can be synthetically generated using the script `01_new_data_generate.ipynb`. It is a python notebook and each individual cell needs to be executed to generate the 3 datasets used in this project. 
 
@@ -30,6 +35,7 @@ The code for each model created are stored in separate folders and the structure
 │   ├── 04_hp_search_bnn_models_deep_ensemble.ipynb (Python notebook for the above file)
 │   ├── 06_household_model_epistermic_BNN.py (Script to train the Monte carlo drop out and deep ensemble models using the best hyperparameters - for power consumption dataset)
 │   ├── 06_household_model_epistermic_BNN.ipynb (Python notebook for the above file)
+|   ├── requirements.txt (Requirements file with all the required packages)
 ├── data (Folder containing all the data)
 │   ├── new_data
 │   ├── ├── data1  (Folder with data for 1st synthetic data contains - train, validation and test sets)
@@ -37,6 +43,7 @@ The code for each model created are stored in separate folders and the structure
 │   ├── ├── data3  (Folder with data for 3rd synthetic data contains - train, validation and test sets)
 │   ├── household_power 
 │   ├── ├── household_power_consumption.txt (Please place the power consumption dataset here )
+
 ```
 
 The python files can be executed using the below code (for synthetic dataset): 
@@ -55,5 +62,6 @@ Note:
 ## Results
 The results for the code will be generated in the `results` folder. 
 The expected output for this project are visualization plots and they are all present in the above mentioned folder. Further, we also generate the MSE, RMSE and MAE scores and store it in the results folder. 
+
 
 
