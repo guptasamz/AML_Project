@@ -1,4 +1,8 @@
-# AML Project README
+# Uncertainty Quantification using Bayesian Neural Networks
+
+This project, completed for the Advanced Machine Learning class at Vanderbilt University, examines techniques for quantifying uncertainty in machine learning predictions, with a case study on household power consumption. It explores Bayesian Neural Networks, specifically utilizing Monte Carlo Dropout and Deep Ensembles, to improve the accuracy and robustness of uncertainty estimates. Through experiments on simulated and real-world datasets, the study finds that Deep Ensembles provide superior adaptability and reliability compared to Monte Carlo Dropout.
+
+
 
 ## Python version and Packages
 The python version used for this project was `Python 3.9.18`. The required packages for this project can be installed using the `requirements.txt` file. Please use the below code to install all the packages.
